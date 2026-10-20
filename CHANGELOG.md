@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `deployment_timeout` or (compose) `fresh_volumes` no longer calls Dokploy
   or starts a deploy. The provider saves the new value in the state only.
   `dokploy_application` and the database resources already worked this way.
+- `dokploy_project` and its data source: the `environments` list has a fixed
+  order now. The default environment is first, then the others sort by name.
+  Dokploy returns the environments in no fixed order, so a refresh could
+  reorder the list and change `environments[0]`.
 
 ## [1.9.1] - 2026-10-13
 
