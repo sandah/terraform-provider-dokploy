@@ -76,9 +76,11 @@ func TestGetListUpdateDeleteSSHKey(t *testing.T) {
 	}
 }
 
+// The recorded message/code are preserved below; data follows the pinned
+// v0.30.8 OpenAPI adapter wire shape, rather than a fresh live capture.
 func TestGetSSHKeyNotFound(t *testing.T) {
 	srv := testRoutes(t,
-		route{Method: http.MethodGet, Path: "/api/sshKey.one", Status: 404, Body: missingRecordErrorFixture("sshKey.one", 404)},
+		route{Method: http.MethodGet, Path: "/api/sshKey.one", Status: 404, Body: `{"message":"SSH Key not found","code":"NOT_FOUND","data":{"code":"NOT_FOUND","httpStatus":404,"path":"sshKey.one"}}`},
 	)
 	defer srv.Close()
 	c := testClient(t, srv)

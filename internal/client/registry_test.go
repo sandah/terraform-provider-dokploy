@@ -57,9 +57,11 @@ func TestCreateGetListRegistry(t *testing.T) {
 	}
 }
 
+// The recorded message/code are preserved below; data follows the pinned
+// v0.30.8 OpenAPI adapter wire shape, rather than a fresh live capture.
 func TestGetRegistryNotFound(t *testing.T) {
 	srv := testRoutes(t,
-		route{Method: http.MethodGet, Path: "/api/registry.one", Status: 404, Body: missingRecordErrorFixture("registry.one", 404)},
+		route{Method: http.MethodGet, Path: "/api/registry.one", Status: 404, Body: `{"message":"Registry not found","code":"NOT_FOUND","data":{"code":"NOT_FOUND","httpStatus":404,"path":"registry.one"}}`},
 	)
 	defer srv.Close()
 	c := testClient(t, srv)

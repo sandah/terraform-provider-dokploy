@@ -55,7 +55,7 @@ func TestTestConnectionDoesNotTreatOperation404AsResourceAbsence(t *testing.T) {
 	defer srv.Close()
 
 	err := testClient(t, srv).TestConnection(context.Background(), "gitea.testConnection", map[string]string{"giteaId": "nope"})
-	if err == nil || errors.Is(err, ErrNotFound) {
+	if err == nil || errors.Is(err, ErrNotFound) || !strings.Contains(err.Error(), "Gitea Provider not found") {
 		t.Errorf("err = %v, want an operation diagnostic", err)
 	}
 }

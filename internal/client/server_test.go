@@ -72,9 +72,11 @@ func TestCreateGetListServer(t *testing.T) {
 	}
 }
 
+// The recorded message/code are preserved below; data follows the pinned
+// v0.30.8 OpenAPI adapter wire shape, rather than a fresh live capture.
 func TestGetServerNotFound(t *testing.T) {
 	srv := testRoutes(t,
-		route{Method: http.MethodGet, Path: "/api/server.one", Status: 404, Body: missingRecordErrorFixture("server.one", 404)},
+		route{Method: http.MethodGet, Path: "/api/server.one", Status: 404, Body: `{"message":"Server not found","code":"NOT_FOUND","data":{"code":"NOT_FOUND","httpStatus":404,"path":"server.one"}}`},
 	)
 	defer srv.Close()
 	c := testClient(t, srv)

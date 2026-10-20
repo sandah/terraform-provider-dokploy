@@ -17,39 +17,12 @@ import (
 
 func hardenedReadFixture(t *testing.T, path string) (string, string, map[string]any) {
 	t.Helper()
-	var dto any
-	switch path {
-	case "/project.one":
-		dto = Project{ProjectID: "expected", Name: "lab", CreatedAt: "2026-10-15T00:00:00Z", Environments: []Environment{{EnvironmentID: "env", Name: "production", ProjectID: "expected", IsDefault: true}}}
-	case "/environment.one":
-		dto = Environment{EnvironmentID: "expected", Name: "lab", ProjectID: "parent"}
-	case "/compose.one":
-		dto = Compose{ComposeID: "expected", Name: "lab", AppName: "lab-abcdef", EnvironmentID: "parent", ComposeType: "docker-compose", SourceType: "raw", ComposeFile: "services: {}", ComposePath: "./docker-compose.yml", ComposeStatus: "done", CreatedAt: "2026-10-15T00:00:00Z"}
-	case "/domain.one":
-		dto = Domain{DomainID: "expected", Host: "lab.invalid", Path: "/", InternalPath: "/", CertificateType: "none", DomainType: "compose", ComposeID: ptr("parent"), CreatedAt: "2026-10-15T00:00:00Z"}
-	case "/destination.one":
-		dto = Destination{DestinationID: "expected", Name: "lab", Provider: "AWS", CreatedAt: "2026-10-15T00:00:00Z"}
-	case "/server.one":
-		dto = Server{ServerID: "expected", Name: "lab", IPAddress: "192.0.2.1", Username: "root", AppName: "lab-abcdef", ServerType: "deploy", CreatedAt: "2026-10-15T00:00:00Z"}
-	case "/sshKey.one":
-		dto = SSHKey{SSHKeyID: "expected", Name: "lab", PublicKey: "FAKE_PUBLIC", PrivateKey: "FAKE_PRIVATE", CreatedAt: "2026-10-15T00:00:00Z"}
-	case "/volumeBackups.one":
-		dto = VolumeBackup{VolumeBackupID: "expected", Name: "lab", VolumeName: "lab-data", DestinationID: "dest", ServiceType: "compose", ComposeID: ptr("parent"), AppName: "lab-abcdef", CreatedAt: "2026-10-15T00:00:00Z"}
-	default:
+	identity := map[string]string{"/project.one": "projectId", "/environment.one": "environmentId", "/compose.one": "composeId", "/domain.one": "domainId", "/destination.one": "destinationId", "/server.one": "serverId", "/sshKey.one": "sshKeyId", "/volumeBackups.one": "volumeBackupId"}[path]
+	if identity == "" {
 		t.Fatal("unhandled fixture")
 	}
-	raw, err := json.Marshal(dto)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var object map[string]any
-	if err = json.Unmarshal(raw, &object); err != nil {
-		t.Fatal(err)
-	}
-	identity := map[string]string{"/project.one": "projectId", "/environment.one": "environmentId", "/compose.one": "composeId", "/domain.one": "domainId", "/destination.one": "destinationId", "/server.one": "serverId", "/sshKey.one": "sshKeyId", "/volumeBackups.one": "volumeBackupId"}[path]
-	return identity, "expected", object
+	return identity, "expected", map[string]any{identity: "expected"}
 }
-func ptr(v string) *string { return &v }
 
 func TestHardenedReadRejectsUntrustedSuccess(t *testing.T) {
 	paths := []string{"/compose.one", "/project.one", "/environment.one", "/domain.one", "/destination.one", "/server.one", "/sshKey.one", "/volumeBackups.one"}
@@ -63,19 +36,9 @@ func TestHardenedReadRejectsUntrustedSuccess(t *testing.T) {
 			}
 			wrong[key] = "foreign"
 			wrongRaw, _ := json.Marshal(wrong)
-			sparse, _ := json.Marshal(map[string]string{key: id})
-			missing := map[string]any{}
-			for k, v := range object {
-				missing[k] = v
-			}
-			delete(missing, "name")
-			if path == "/domain.one" {
-				delete(missing, "host")
-			}
-			missingRaw, _ := json.Marshal(missing)
 			duplicates := append([]byte(`{"`+key+`":"foreign",`), valid[1:]...)
 			folded := append([]byte(`{"`+strings.ToUpper(key)+`":"foreign",`), valid[1:]...)
-			for name, body := range map[string][]byte{"empty": {}, "null": []byte(`null`), "object": []byte(`{}`), "array": []byte(`[]`), "wrong_id": wrongRaw, "id_only": sparse, "missing_field": missingRaw, "duplicate_id": duplicates, "case_variant_id": folded, "malformed": []byte(`{"` + key + `":`), "trailing": append(append([]byte{}, valid...), []byte(` {}`)...)} {
+			for name, body := range map[string][]byte{"empty": {}, "null": []byte(`null`), "object": []byte(`{}`), "array": []byte(`[]`), "wrong_id": wrongRaw, "duplicate_id": duplicates, "case_variant_id": folded, "malformed": []byte(`{"` + key + `":`), "trailing": append(append([]byte{}, valid...), []byte(` {}`)...)} {
 				t.Run(name, func(t *testing.T) {
 					srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(body) }))
 					defer srv.Close()
@@ -94,7 +57,7 @@ func TestHardenedReadRejectsUntrustedSuccess(t *testing.T) {
 			defer srv.Close()
 			var out map[string]any
 			if err := testClient(t, srv).Get(context.Background(), path, url.Values{key: {id}}, &out); err != nil {
-				t.Fatalf("valid complete object: %v", err)
+				t.Fatalf("valid identity object: %v", err)
 			}
 		})
 	}
@@ -103,10 +66,13 @@ func TestHardenedReadRejectsUntrustedSuccess(t *testing.T) {
 func TestHardenedAmbiguous404DoesNotEraseState(t *testing.T) {
 	for name, body := range map[string]string{
 		"empty": "", "html": "<html>404 Not Found</html>", "malformed": `{"message":`, "unstructured": `{"message":"Project not found","code":"NOT_FOUND"}`,
-		"wrong_route":      `{"code":"NOT_FOUND","message":"Project not found","data":{"code":"NOT_FOUND","httpStatus":404,"path":"compose.one"}}`,
-		"route_error":      `{"code":"NOT_FOUND","message":"No procedure found on path project.one","data":{"code":"NOT_FOUND","httpStatus":404,"path":"project.one"}}`,
-		"duplicate_code":   `{"code":"UNAUTHORIZED","code":"NOT_FOUND","message":"Project not found","data":{"code":"NOT_FOUND","httpStatus":404,"path":"project.one"}}`,
-		"duplicate_nested": `{"code":"NOT_FOUND","message":"Project not found","data":{"code":"NOT_FOUND","httpStatus":403,"httpStatus":404,"path":"project.one"}}`,
+		"wrong_code":          `{"code":"UNAUTHORIZED","message":"Project not found","data":{"code":"NOT_FOUND","httpStatus":404,"path":"project.one"}}`,
+		"wrong_data_code":     `{"code":"NOT_FOUND","message":"Project not found","data":{"code":"FORBIDDEN","httpStatus":404,"path":"project.one"}}`,
+		"nested_case_variant": `{"code":"NOT_FOUND","message":"Project not found","data":{"code":"FORBIDDEN","Code":"NOT_FOUND","httpStatus":404,"path":"project.one"}}`,
+		"wrong_http_status":   `{"code":"NOT_FOUND","message":"Project not found","data":{"code":"NOT_FOUND","httpStatus":403,"path":"project.one"}}`,
+		"wrong_route":         `{"code":"NOT_FOUND","message":"Project not found","data":{"code":"NOT_FOUND","httpStatus":404,"path":"compose.one"}}`,
+		"duplicate_code":      `{"code":"UNAUTHORIZED","code":"NOT_FOUND","message":"Project not found","data":{"code":"NOT_FOUND","httpStatus":404,"path":"project.one"}}`,
+		"duplicate_nested":    `{"code":"NOT_FOUND","message":"Project not found","data":{"code":"NOT_FOUND","httpStatus":403,"httpStatus":404,"path":"project.one"}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(404); _, _ = fmt.Fprint(w, body) }))
@@ -132,24 +98,29 @@ func TestHardenedAmbiguous404DoesNotEraseState(t *testing.T) {
 	}
 }
 
+// These protocol mocks deliberately use the independently recorded diagnostic
+// strings. Their data blocks exercise the tRPC transport contract separately
+// from the original recorded message/code fixtures.
 func TestHardenedConfirmedMissingRecord(t *testing.T) {
-	for _, path := range []string{"/compose.one", "/project.one", "/environment.one", "/domain.one", "/destination.one", "/server.one", "/sshKey.one", "/volumeBackups.one", "/port.one"} {
-		t.Run(path, func(t *testing.T) {
-			name := strings.TrimPrefix(strings.Split(path, ".")[0], "/")
-			if name == "volumeBackups" {
-				name = "volumeBackup"
+	for _, test := range []struct {
+		path, key, message, code string
+		status                   int
+	}{
+		{"/ai.one", "aiId", "AI settings not found", "NOT_FOUND", 404},
+		{"/bitbucket.one", "bitbucketId", "Bitbucket Provider not found", "NOT_FOUND", 404},
+		{"/gitea.one", "giteaId", "Gitea Provider not found", "NOT_FOUND", 404},
+		{"/gitlab.one", "gitlabId", "Gitlab Provider not found", "NOT_FOUND", 404},
+		{"/user.one", "userId", "User not found in this organization", "NOT_FOUND", 404},
+		{"/port.one", "portId", "Port not found", "BAD_REQUEST", 400},
+	} {
+		t.Run(test.path, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]any{"code": test.code, "message": test.message, "data": map[string]any{"code": test.code, "httpStatus": test.status, "path": strings.TrimPrefix(test.path, "/")}})
+			if err != nil {
+				t.Fatal(err)
 			}
-			key := name + "Id"
-			code := "NOT_FOUND"
-			status := 404
-			if path == "/port.one" {
-				code = "BAD_REQUEST"
-				status = 400
-			}
-			raw, _ := json.Marshal(map[string]any{"code": code, "message": name + " not found", "data": map[string]any{"code": code, "httpStatus": status, "path": strings.TrimPrefix(path, "/")}})
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(status); _, _ = w.Write(raw) }))
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(test.status); _, _ = w.Write(raw) }))
 			defer srv.Close()
-			err := testClient(t, srv).Get(context.Background(), path, url.Values{key: {"gone"}}, nil)
+			err = testClient(t, srv).Get(context.Background(), test.path, url.Values{test.key: {"gone"}}, nil)
 			if !errors.Is(err, ErrNotFound) {
 				t.Fatalf("confirmed missing record: %v", err)
 			}
@@ -166,24 +137,6 @@ func TestHardenedResponseLimit(t *testing.T) {
 	if err == nil {
 		t.Fatal("oversized response accepted")
 	}
-}
-
-// Complete protocol envelope for legacy not-found tests. Bare status codes
-// and unstructured messages are covered separately as unsafe/ambiguous.
-func missingRecordErrorFixture(path string, status int) string {
-	entity := strings.Split(path, ".")[0]
-	switch entity {
-	case "certificates":
-		entity = "certificate"
-	case "volumeBackups":
-		entity = "volumeBackup"
-	}
-	code := "NOT_FOUND"
-	if status == 400 {
-		code = "BAD_REQUEST"
-	}
-	raw, _ := json.Marshal(map[string]any{"code": code, "message": entity + " not found", "data": map[string]any{"code": code, "httpStatus": status, "path": path}})
-	return string(raw)
 }
 
 func TestHardenedMutationRejectsHTMLSuccess(t *testing.T) {
@@ -203,38 +156,106 @@ func TestHardenedMutationRejectsHTMLSuccess(t *testing.T) {
 	}
 }
 
-func TestHardenedManagedCollectionsRejectSparseEntries(t *testing.T) {
-	for _, test := range []struct {
-		path, field string
-		value       any
-	}{
-		{"/compose.one", "serviceNetworks", []any{map[string]any{"serviceName": "web"}}},
-		{"/project.one", "projectTags", []any{map[string]any{"id": "join"}}},
-		{"/project.one", "environments", []any{map[string]any{"environmentId": "e", "name": "prod"}}},
+func TestReadDecodeFailurePreservesOutput(t *testing.T) {
+	out := map[string]int{"prior": 7}
+	if err := decodeResponse([]byte(`{"prior":"wrong type"}`), &out); err == nil || out["prior"] != 7 {
+		t.Fatalf("decode failed to preserve prior output: %+v err=%v", out, err)
+	}
+}
+
+func TestReadAllowsSparseObjectsAndFutureValues(t *testing.T) {
+	for name, body := range map[string]string{
+		"identity_only": `{"composeId":"expected"}`,
+		"future_fields": `{"composeId":"expected","composeType":"future-compose","sourceType":"future-source","composeStatus":"future-status","futureField":{"enabled":true},"serviceNetworks":[{"futureNetworkField":true}]}`,
 	} {
-		t.Run(test.field, func(t *testing.T) {
-			key, id, object := hardenedReadFixture(t, test.path)
-			object[test.field] = test.value
-			raw, _ := json.Marshal(object)
-			if validateResponse(http.MethodGet, test.path, url.Values{key: {id}}, raw) == nil {
-				t.Fatal("sparse collection accepted")
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = fmt.Fprint(w, body) }))
+			defer srv.Close()
+			var out Compose
+			if err := testClient(t, srv).Get(context.Background(), "/compose.one", url.Values{"composeId": {"expected"}}, &out); err != nil || out.ComposeID != "expected" {
+				t.Fatalf("read=%+v err=%v", out, err)
 			}
 		})
 	}
 }
 
-func TestHardenedDocumentedNullEnvironmentEnv(t *testing.T) {
-	key, id, object := hardenedReadFixture(t, "/environment.one")
-	object["env"] = nil
-	raw, _ := json.Marshal(object)
-	if err := validateResponse(http.MethodGet, "/environment.one", url.Values{key: {id}}, raw); err != nil {
-		t.Fatal(err)
+func TestJSONNestedMapKeyCase(t *testing.T) {
+	for _, test := range []struct {
+		name, body string
+		valid      bool
+	}{
+		{"docker_labels", `{"composeId":"expected","labels":{"Team":"Ops","team":"Dev"}}`, true},
+		{"swarm_labels", `{"composeId":"expected","swarm":{"labels":{"Zone":"EU","zone":"US"}}}`, true},
+		{"nested_array", `{"items":[{"Team":"Ops","team":"Dev"}]}`, true},
+		{"duplicate_nested", `{"labels":{"team":"Ops","team":"Dev"}}`, false},
+		{"duplicate_in_array", `{"items":[{"team":"Ops","team":"Dev"}]}`, false},
+		{"duplicate_top_level", `{"composeId":"expected","composeId":"foreign"}`, false},
+		{"folded_top_level", `{"composeId":"expected","ComposeId":"foreign"}`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := strictJSON([]byte(test.body)); (err == nil) != test.valid {
+				t.Fatalf("valid=%v err=%v", test.valid, err)
+			}
+		})
 	}
 }
 
-func TestReadDecodeFailurePreservesOutput(t *testing.T) {
-	out := map[string]int{"prior": 7}
-	if err := decodeResponse([]byte(`{"prior":"wrong type"}`), &out); err == nil || out["prior"] != 7 {
-		t.Fatalf("decode failed to preserve prior output: %+v err=%v", out, err)
+func TestDeleteAPIKeyAlreadyGone(t *testing.T) {
+	for _, test := range []struct {
+		name, path, body string
+		gone             bool
+	}{
+		{"known_delete", "/user.deleteApiKey", `{"message":"API key not found","code":"NOT_FOUND","data":{"code":"NOT_FOUND","httpStatus":404,"path":"user.deleteApiKey"}}`, true},
+		{"wrong_route", "/user.deleteApiKey", `{"message":"API key not found","code":"NOT_FOUND","data":{"code":"NOT_FOUND","httpStatus":404,"path":"user.delete"}}`, false},
+		{"proxy_html", "/user.deleteApiKey", `<html>404 Not Found</html>`, false},
+		{"unrelated_post", "/user.update", `{"message":"User not found","code":"NOT_FOUND","data":{"code":"NOT_FOUND","httpStatus":404,"path":"user.update"}}`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(404); _, _ = fmt.Fprint(w, test.body) }))
+			defer srv.Close()
+			c := testClient(t, srv)
+			var err error
+			if test.path == "/user.deleteApiKey" {
+				err = c.DeleteAPIKey(context.Background(), "gone")
+			} else {
+				err = c.Post(context.Background(), test.path, map[string]string{"userId": "gone"}, nil)
+			}
+			if err == nil || errors.Is(err, ErrNotFound) != test.gone {
+				t.Fatalf("gone=%v err=%v", test.gone, err)
+			}
+		})
+	}
+}
+
+func TestOrganizationForbiddenMappingIsExact(t *testing.T) {
+	for _, test := range []struct {
+		message, code string
+		gone          bool
+	}{
+		{"You are not a member of this organization", "FORBIDDEN", true},
+		{"Forbidden", "FORBIDDEN", false},
+		{"You are not a member of this organization anymore", "FORBIDDEN", false},
+		{"You are not a member of this organization", "UNAUTHORIZED", false},
+	} {
+		t.Run(test.message+test.code, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]string{"message": test.message, "code": test.code})
+			if err != nil {
+				t.Fatal(err)
+			}
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(403); _, _ = w.Write(raw) }))
+			defer srv.Close()
+			_, err = testClient(t, srv).GetOrganization(context.Background(), "gone")
+			if err == nil || errors.Is(err, ErrNotFound) != test.gone {
+				t.Fatalf("gone=%v err=%v", test.gone, err)
+			}
+		})
+	}
+}
+
+func TestDecodeTypeErrorDoesNotPartiallyOverwriteStruct(t *testing.T) {
+	out := Project{ProjectID: "prior", Name: "keep"}
+	before := out
+	if err := decodeResponse([]byte(`{"name":"overwritten","projectId":123}`), &out); err == nil || !reflect.DeepEqual(out, before) {
+		t.Fatalf("out=%+v err=%v", out, err)
 	}
 }

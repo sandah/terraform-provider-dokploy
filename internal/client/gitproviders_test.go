@@ -139,9 +139,11 @@ func TestGetUpdateGitlabBitbucketGitea(t *testing.T) {
 	}
 }
 
+// The recorded message/code are preserved below; data follows the pinned
+// v0.30.8 OpenAPI adapter wire shape, rather than a fresh live capture.
 func TestGetGitlabNotFound(t *testing.T) {
 	srv := testRoutes(t,
-		route{Method: http.MethodGet, Path: "/api/gitlab.one", Status: 404, Body: missingRecordErrorFixture("gitlab.one", 404)},
+		route{Method: http.MethodGet, Path: "/api/gitlab.one", Status: 404, Body: `{"message":"Gitlab Provider not found","code":"NOT_FOUND","data":{"code":"NOT_FOUND","httpStatus":404,"path":"gitlab.one"}}`},
 	)
 	defer srv.Close()
 	c := testClient(t, srv)

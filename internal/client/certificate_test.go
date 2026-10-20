@@ -64,9 +64,11 @@ func TestCreateGetListCertificate(t *testing.T) {
 	}
 }
 
+// The recorded message/code are preserved below; data follows the pinned
+// v0.30.8 OpenAPI adapter wire shape, rather than a fresh live capture.
 func TestGetCertificateNotFound(t *testing.T) {
 	srv := testRoutes(t,
-		route{Method: http.MethodGet, Path: "/api/certificates.one", Status: 404, Body: missingRecordErrorFixture("certificates.one", 404)},
+		route{Method: http.MethodGet, Path: "/api/certificates.one", Status: 404, Body: `{"message":"Certificate not found","code":"NOT_FOUND","data":{"code":"NOT_FOUND","httpStatus":404,"path":"certificates.one"}}`},
 	)
 	defer srv.Close()
 	c := testClient(t, srv)

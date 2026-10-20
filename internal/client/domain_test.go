@@ -18,7 +18,7 @@ const domainResponse = `{
   "createdAt":"2026-07-26T16:41:14.242Z","composeId":null,
   "customCertResolver":null,"applicationId":"a1",
   "certificateType":"letsencrypt","internalPath":"/","stripPath":false,
-  "middlewares":[],"forwardAuthEnabled":false,"enabled":true
+  "middlewares":[],"forwardAuthEnabled":false
 }`
 
 func TestGetDomainDecodesEveryField(t *testing.T) {
