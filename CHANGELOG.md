@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Changing this policy alone does not call Dokploy or deploy the stack.
   Retained volumes need separate backup and cleanup ownership.
 
+### Fixed
+
+- `dokploy_compose` and `dokploy_libsql`: a change of only `deploy_on_change`,
+  `deployment_timeout` or (compose) `fresh_volumes` no longer calls Dokploy
+  or starts a deploy. The provider saves the new value in the state only.
+  `dokploy_application` and the database resources already worked this way.
+
 ## [1.9.1] - 2026-10-13
 
 ### Changed
