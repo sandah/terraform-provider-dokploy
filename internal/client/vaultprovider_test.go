@@ -83,10 +83,12 @@ func TestCreateGetAndListVaultProvider(t *testing.T) {
 
 // GetVaultProvider on a bogus id reads the ordinary tRPC-OpenAPI not-found
 // envelope: HTTP 404, no repeat of port.one's 400 anomaly (doc.go wave 6c).
+// The recorded message/code are preserved below; data follows the pinned
+// v0.30.8 OpenAPI adapter wire shape, rather than a fresh live capture.
 func TestGetVaultProviderNotFound(t *testing.T) {
 	srv := testRoutes(t, route{
 		Method: http.MethodGet, Path: "/api/vaultProvider.one", Status: http.StatusNotFound,
-		Body: `{"message":"Vault provider not found","code":"NOT_FOUND"}`,
+		Body: `{"message":"Vault provider not found","code":"NOT_FOUND","data":{"code":"NOT_FOUND","httpStatus":404,"path":"vaultProvider.one"}}`,
 	})
 	defer srv.Close()
 

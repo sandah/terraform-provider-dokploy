@@ -190,7 +190,7 @@ func TestEnvironmentServicesDecodesLibsql(t *testing.T) {
 		Method: http.MethodGet,
 		Path:   "/api/environment.one",
 		Status: http.StatusOK,
-		Body: `{"libsql":[{"libsqlId":"lib-1","name":"edge"},
+		Body: `{"environmentId":"env-1","libsql":[{"libsqlId":"lib-1","name":"edge"},
 		                  {"libsqlId":"lib-2","name":"other"}]}`,
 	})
 	defer srv.Close()

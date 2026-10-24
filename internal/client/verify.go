@@ -10,8 +10,9 @@ import "context"
 //
 // Success is HTTP 200 with a bare true body, which this method discards. On
 // failure the error carries the server message verbatim: every failure
-// probed is HTTP 400. A gitea id that does not exist is HTTP 404, which the
-// client maps to ErrNotFound without the message. The message of
+// probed is HTTP 400. A gitea id that does not exist is HTTP 404; the
+// client retains its diagnostic instead of mapping a connection test to
+// resource absence. The message of
 // destination.testConnection contains the full rclone command line, which
 // includes both credentials, so callers must redact it.
 func (c *Client) TestConnection(ctx context.Context, endpoint string, body any) error {

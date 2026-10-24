@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Retain state on ambiguous missing-record responses and invalid resource
+  reads. Single-record reads verify the requested identity, and confirmed
+  resource-absence envelopes still reconcile deletion. Preserve the documented
+  organization membership 403 mapping and connection-test error diagnostics.
+
 ## [1.10.0] - 2026-10-20
 
 ### Added
