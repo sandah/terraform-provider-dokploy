@@ -62,9 +62,11 @@ func TestTagDecodesNullColor(t *testing.T) {
 	}
 }
 
+// The recorded message/code are preserved below; data follows the pinned
+// v0.30.8 OpenAPI adapter wire shape, rather than a fresh live capture.
 func TestGetTagNotFound(t *testing.T) {
 	srv := testRoutes(t,
-		route{Method: http.MethodGet, Path: "/api/tag.one", Status: 404, Body: `{"message":"Tag not found","code":"NOT_FOUND"}`},
+		route{Method: http.MethodGet, Path: "/api/tag.one", Status: 404, Body: `{"message":"Tag not found","code":"NOT_FOUND","data":{"code":"NOT_FOUND","httpStatus":404,"path":"tag.one"}}`},
 	)
 	defer srv.Close()
 	if _, err := testClient(t, srv).GetTag(context.Background(), "nope"); !errors.Is(err, ErrNotFound) {

@@ -427,8 +427,10 @@ resource "dokploy_environment" "second" {
 	}
 	return []resource.TestStep{
 		{
-			Config: config("dokploy_project.test.environments[0].id"),
-			Check:  resource.TestCheckResourceAttrPair(addr, "environment_id", "dokploy_project.test", "environments.0.id"),
+			// The second environment is created in this same step, so list
+			// position is not a stable way to select the initial default.
+			Config: config("dokploy_project.test.production_environment_id"),
+			Check:  resource.TestCheckResourceAttrPair(addr, "environment_id", "dokploy_project.test", "production_environment_id"),
 		},
 		{
 			Config: config("dokploy_environment.second.id"),

@@ -173,9 +173,11 @@ func TestGetListDeleteNotification(t *testing.T) {
 	}
 }
 
+// The recorded message/code are preserved below; data follows the pinned
+// v0.30.8 OpenAPI adapter wire shape, rather than a fresh live capture.
 func TestGetNotificationNotFound(t *testing.T) {
 	srv := testRoutes(t,
-		route{Method: http.MethodGet, Path: "/api/notification.one", Status: 404, Body: `{"message":"Notification not found","code":"NOT_FOUND"}`},
+		route{Method: http.MethodGet, Path: "/api/notification.one", Status: 404, Body: `{"message":"Notification not found","code":"NOT_FOUND","data":{"code":"NOT_FOUND","httpStatus":404,"path":"notification.one"}}`},
 	)
 	defer srv.Close()
 	c := testClient(t, srv)

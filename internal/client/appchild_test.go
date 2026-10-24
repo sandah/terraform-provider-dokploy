@@ -249,10 +249,12 @@ func TestChildUpdatesSendTheFullFieldSet(t *testing.T) {
 // TestGetPortMapsIts400NotFound pins the one-endpoint exception documented on
 // GetPort. Without it, a port deleted outside Terraform surfaces as a hard
 // apply error rather than drift the provider can reconcile.
+// The recorded message/code are preserved below; data follows the pinned
+// v0.30.8 OpenAPI adapter wire shape, rather than a fresh live capture.
 func TestGetPortMapsIts400NotFound(t *testing.T) {
 	srv := testRoutes(t, route{
 		Method: http.MethodGet, Path: "/api/port.one", Status: http.StatusBadRequest,
-		Body: `{"message":"Port not found","code":"BAD_REQUEST"}`,
+		Body: `{"message":"Port not found","code":"BAD_REQUEST","data":{"code":"BAD_REQUEST","httpStatus":400,"path":"port.one"}}`,
 	})
 	defer srv.Close()
 

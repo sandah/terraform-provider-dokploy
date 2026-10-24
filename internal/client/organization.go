@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
 )
 
 // Organization is one Dokploy organization. Dokploy stores organizations
@@ -72,7 +71,7 @@ func (c *Client) GetOrganization(ctx context.Context, id string) (*Organization,
 	var o Organization
 	if err := c.Get(ctx, "/organization.one", url.Values{"organizationId": {id}}, &o); err != nil {
 		var apiErr *DokployError
-		if errors.As(err, &apiErr) && apiErr.HTTPStatus == 403 && strings.Contains(apiErr.Message, "not a member") {
+		if errors.As(err, &apiErr) && apiErr.HTTPStatus == 403 && apiErr.Code == "FORBIDDEN" && apiErr.Message == "You are not a member of this organization" {
 			return nil, fmt.Errorf("organization %s: %w", id, ErrNotFound)
 		}
 		return nil, err
